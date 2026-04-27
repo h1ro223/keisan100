@@ -1,0 +1,190 @@
+/* 計算100トレーニング - DS本家再現 */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--blue:#3355cc;--green:#22aa44;--red:#dd2244;--pink:#ff69b4;--gray:#ccc;--r:8px}
+html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#e8e8e8;color:#111;overflow:hidden}
+.screen{display:none;height:100vh;flex-direction:column}.screen.active{display:flex}.hidden{display:none!important}
+
+/* タイトル */
+#screen-title{align-items:center;justify-content:center;padding:20px 16px;background:#fff;overflow-y:auto}
+.title-wrap{max-width:500px;width:100%;text-align:center;display:flex;flex-direction:column;gap:20px}
+.logo-100{display:block;font-size:clamp(90px,24vw,160px);font-weight:900;line-height:1;letter-spacing:-6px;color:var(--blue)}
+.logo-sub{font-size:clamp(20px,5vw,32px);font-weight:800;letter-spacing:.15em}
+.title-options{background:#f0f4ff;border:2px solid var(--gray);border-radius:var(--r);padding:18px;text-align:left;display:flex;flex-direction:column;gap:12px}
+.opt-label{font-size:13px;font-weight:700;color:#888}
+.opt-row{display:flex;gap:10px}.chk-row{flex-wrap:wrap}
+.opt-btn{flex:1;padding:12px;border-radius:8px;border:2px solid var(--gray);background:#fff;color:#888;font-size:16px;font-weight:700;cursor:pointer;transition:.2s}
+.opt-btn.active{border-color:var(--blue);color:var(--blue);background:#eef2ff}
+.chk-label{display:flex;align-items:center;gap:6px;font-size:20px;font-weight:800;padding:8px 18px;border-radius:8px;background:#fff;border:2px solid var(--gray);cursor:pointer}
+.chk-label:has(input:checked){border-color:var(--blue);background:#eef2ff}
+.chk-label input{accent-color:var(--blue);width:18px;height:18px}
+.big-btn{width:100%;padding:18px;background:var(--blue);border:none;border-radius:var(--r);font-size:24px;font-weight:900;color:#fff;cursor:pointer}
+.big-btn:active{opacity:.8}.sec-btn{background:#fff;color:#111;border:2px solid var(--gray);font-size:18px}
+.title-hint{font-size:12px;color:#888}
+
+/* ローディング */
+#screen-loading{align-items:center;justify-content:center;background:#fff}
+.loading-wrap{text-align:center;display:flex;flex-direction:column;align-items:center;gap:20px}
+.loading-spinner{width:48px;height:48px;border:5px solid var(--gray);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading-text{font-size:18px;font-weight:700}
+
+/* ===== ゲーム画面 ===== */
+#screen-game{background:#e0e0e0}
+.game-top{display:flex;align-items:center;gap:10px;padding:6px 14px;background:#dde4ff;border-bottom:2px solid var(--gray);flex-shrink:0;height:32px}
+#prog-text{font-size:14px;font-weight:800;color:var(--blue);min-width:68px}
+.prog-track{flex:1;height:6px;background:var(--gray);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;width:0;background:var(--blue);border-radius:99px;transition:width .35s}
+
+.game-main{display:flex;flex:1;min-height:0;overflow:hidden}
+
+/* === 左パネル: 固定3スロット === */
+.g-left{
+  width:50%;
+  border-right:3px solid #999;
+  display:flex;
+  flex-direction:column;
+  background:#fff;
+  position:relative;
+  overflow:hidden;
+}
+
+/* 各スロット: 均等3分割 */
+.slot{
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:8px 14px;
+  font-size:clamp(32px,6vw,56px);
+  font-weight:900;
+  color:#111;
+  position:relative;
+  border-bottom:1px solid #e0e0e0;
+  transition:opacity .3s;
+  overflow:hidden;
+}
+.slot:last-of-type{border-bottom:none}
+
+/* 上スロット(前の問題): ややグレー */
+.slot-prev{color:#555}
+
+/* 中央スロット(現在): 黒枠で囲む */
+.slot-cur{border:4px solid #222;border-radius:4px;margin:4px 8px;flex:1.05}
+
+/* 下スロット(次の問題): 通常 */
+.slot-next{color:#111}
+
+/* スロット内テキスト */
+.slot-expr{white-space:nowrap}
+.slot-ans{margin-left:4px}
+.slot-mark{margin-left:6px;font-size:clamp(28px,5vw,48px)}
+.slot-mark.ok{color:var(--pink)}
+.slot-mark.ng{color:var(--red)}
+
+/* マイルストーン（問題の上に小さく表示） */
+.ms-badge{
+  position:absolute;left:50%;transform:translateX(-50%);
+  top:auto;z-index:10;
+  background:#888;color:#fff;
+  font-size:clamp(14px,2.5vw,20px);font-weight:800;
+  padding:4px 16px;border-radius:20px;
+  white-space:nowrap;
+  animation:fadeInOut 1.5s ease both;
+}
+/* 上スロットと中央スロットの間に配置 */
+.ms-badge.show-between{top:calc(33.3% - 12px)}
+
+@keyframes fadeInOut{
+  0%{opacity:0;transform:translateX(-50%) scale(.8)}
+  15%{opacity:1;transform:translateX(-50%) scale(1)}
+  80%{opacity:1;transform:translateX(-50%) scale(1)}
+  100%{opacity:0;transform:translateX(-50%) scale(.8)}
+}
+
+/* === 右パネル: 入力のみ画面いっぱい === */
+.g-right{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  background:#d8d8d8;
+  position:relative;
+  overflow:hidden;
+}
+
+.input-full{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:10px 14px;
+  padding-bottom:40px; /* フッター分 */
+}
+
+/* キーボード入力 */
+.ans-input{
+  width:100%;max-width:240px;
+  padding:10px;
+  font-size:clamp(40px,10vw,64px);font-weight:900;text-align:center;
+  background:#fff;border:3px solid #999;border-radius:var(--r);
+  color:#111;outline:none;-moz-appearance:textfield;
+}
+.ans-input:focus{border-color:var(--blue)}
+.ans-input::-webkit-outer-spin-button,.ans-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:100%;max-width:280px}
+.np-btn{padding:clamp(10px,2.5vh,20px) 0;border-radius:var(--r);border:2px solid #bbb;background:#fff;color:#111;font-size:clamp(22px,5vw,34px);font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.np-btn:active{background:var(--blue);color:#fff;border-color:var(--blue);transform:scale(.95)}
+.np-zero{grid-column:span 2}.np-del{font-size:clamp(18px,4vw,28px)}
+
+/* 書き直しボタン（大きく） */
+.rewrite-btn{
+  width:100%;max-width:280px;
+  padding:clamp(10px,2vh,16px);
+  border:2px solid #999;border-radius:var(--r);
+  background:#e8e8e8;color:#333;
+  font-size:clamp(16px,3.5vw,22px);font-weight:700;
+  cursor:pointer;
+}
+.rewrite-btn:active{background:#ccc}
+
+/* 手書きキャンバス */
+#hw-canvas{
+  width:100%;max-width:min(280px, calc(100vh - 200px));
+  aspect-ratio:1;
+  border-radius:var(--r);background:#fff;cursor:crosshair;
+  touch-action:none;border:3px solid #999;
+}
+.hw-info{font-size:14px;color:#555}
+#hw-num{font-size:28px;color:var(--blue)}
+
+/* フィードバック */
+.fb{position:absolute;bottom:36px;left:0;right:0;text-align:center;font-size:clamp(16px,3vw,22px);font-weight:800;pointer-events:none;z-index:5}
+.fb.ok-fb{color:var(--green)}.fb.ng-fb{color:var(--red)}
+
+/* やめるボタン（右下小さく） */
+.quit-btn{
+  position:absolute;bottom:28px;right:8px;
+  padding:4px 12px;border:1px solid var(--red);border-radius:4px;
+  background:transparent;color:var(--red);font-size:11px;font-weight:600;
+  cursor:pointer;z-index:5;
+}
+
+/* ===== 結果画面 ===== */
+#screen-result{align-items:center;justify-content:center;padding:20px 16px 50px;overflow-y:auto;background:#fff}
+.res-wrap{max-width:500px;width:100%;display:flex;flex-direction:column;align-items:center;gap:16px}
+.res-title{font-size:clamp(22px,5vw,32px);font-weight:900}
+.res-rank-icon{font-size:64px}.res-rank-name{font-size:26px;font-weight:900;color:var(--blue)}
+.res-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.res-card{background:#f0f4ff;border:2px solid var(--gray);border-radius:var(--r);padding:14px;text-align:center}
+.res-hl{grid-column:span 2;border-color:var(--blue)}
+.rc-label{font-size:13px;font-weight:700;color:#888;margin-bottom:4px}
+.rc-val{font-size:28px;font-weight:900}.rc-big{font-size:40px;color:var(--blue)}
+.rank-tbl{width:100%;background:#f0f4ff;border:2px solid var(--gray);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:3px}
+.rank-r{display:flex;justify-content:space-between;padding:5px 10px;border-radius:5px;font-size:14px;font-weight:600;color:#888;border:1px solid transparent}
+.rank-r.hit{background:rgba(51,85,204,.1);border-color:var(--blue);color:var(--blue);font-weight:800}
+.res-btns{display:flex;gap:10px;width:100%}.res-btns .big-btn{font-size:20px;padding:14px}
+
+/* フッター */
+.footer{position:fixed;bottom:0;left:0;right:0;padding:4px;text-align:center;font-size:10px;color:#888;background:rgba(230,230,230,.95);border-top:1px solid var(--gray);z-index:50}
+.footer a{color:var(--blue);text-decoration:none}

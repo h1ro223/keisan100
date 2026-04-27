@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>計算100トレーニング</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js"></script>
+</head>
+<body>
+  <!-- タイトル -->
+  <div id="screen-title" class="screen active">
+    <div class="title-wrap">
+      <div class="title-logo"><span class="logo-100">100</span><span class="logo-sub">計算トレーニング</span></div>
+      <div class="title-options">
+        <p class="opt-label">入力方式</p>
+        <div class="opt-row">
+          <button class="opt-btn active" id="btn-kb" onclick="selMode('keyboard')">⌨️ キーボード</button>
+          <button class="opt-btn" id="btn-hw" onclick="selMode('handwriting')">✏️ 手書き</button>
+        </div>
+        <p class="opt-label">問題の種類</p>
+        <div class="opt-row chk-row">
+          <label class="chk-label"><input type="checkbox" id="chk-add" checked /> ＋</label>
+          <label class="chk-label"><input type="checkbox" id="chk-sub" checked /> ー</label>
+          <label class="chk-label"><input type="checkbox" id="chk-mul" checked /> ×</label>
+        </div>
+      </div>
+      <button class="big-btn" onclick="startGame()">スタート</button>
+      <p class="title-hint">全100問 ／ 不正解+5秒で次へ ／ タイマーは結果で表示</p>
+    </div>
+  </div>
+  <!-- ローディング -->
+  <div id="screen-loading" class="screen">
+    <div class="loading-wrap"><div class="loading-spinner"></div><p id="loading-text">AIモデルを準備中…</p></div>
+  </div>
+  <!-- ゲーム画面 -->
+  <div id="screen-game" class="screen">
+    <div class="game-top">
+      <span id="prog-text">0 / 100</span>
+      <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
+    </div>
+    <div class="game-main">
+      <!-- 左: 固定3スロット問題表示 -->
+      <div class="g-left">
+        <div class="slot slot-prev" id="slot-prev"></div>
+        <div class="slot slot-cur" id="slot-cur"></div>
+        <div class="slot slot-next" id="slot-next"></div>
+        <!-- マイルストーン（問題間に表示） -->
+        <div class="ms-badge hidden" id="ms-badge"></div>
+      </div>
+      <!-- 右: 入力エリアのみ -->
+      <div class="g-right">
+        <!-- キーボード入力 -->
+        <div id="kb-area" class="input-full">
+          <input type="text" id="ans-input" class="ans-input" inputmode="none" autocomplete="off" placeholder="?" />
+          <div class="numpad">
+            <button class="np-btn" onclick="npIn('1')">1</button><button class="np-btn" onclick="npIn('2')">2</button><button class="np-btn" onclick="npIn('3')">3</button>
+            <button class="np-btn" onclick="npIn('4')">4</button><button class="np-btn" onclick="npIn('5')">5</button><button class="np-btn" onclick="npIn('6')">6</button>
+            <button class="np-btn" onclick="npIn('7')">7</button><button class="np-btn" onclick="npIn('8')">8</button><button class="np-btn" onclick="npIn('9')">9</button>
+            <button class="np-btn np-zero" onclick="npIn('0')">0</button><button class="np-btn np-del" onclick="npDel()">⌫</button>
+          </div>
+          <button class="rewrite-btn" onclick="clearInput()">書き直し</button>
+        </div>
+        <!-- 手書き入力 -->
+        <div id="hw-area" class="input-full hidden">
+          <canvas id="hw-canvas" width="280" height="280"></canvas>
+          <button class="rewrite-btn" onclick="clearCanvas()">書き直し</button>
+          <div class="hw-info">認識: <strong id="hw-num">?</strong></div>
+        </div>
+        <div class="fb" id="feedback"></div>
+        <button class="quit-btn" onclick="quitGame()">やめる</button>
+      </div>
+    </div>
+  </div>
+  <!-- 結果 -->
+  <div id="screen-result" class="screen">
+    <div class="res-wrap">
+      <h1 class="res-title">結果発表</h1>
+      <div class="res-rank-icon" id="res-rank-icon">🚀</div>
+      <div class="res-rank-name" id="res-rank-name">ロケット級</div>
+      <div class="res-cards">
+        <div class="res-card"><div class="rc-label">⏱ 所要時間</div><div class="rc-val" id="rc-pure">--:--</div></div>
+        <div class="res-card"><div class="rc-label">❌ ミス数</div><div class="rc-val" id="rc-miss">0回</div></div>
+        <div class="res-card"><div class="rc-label">⚡ ペナルティ</div><div class="rc-val" id="rc-pen">+0秒</div></div>
+        <div class="res-card res-hl"><div class="rc-label">🏁 合計タイム</div><div class="rc-val rc-big" id="rc-total">--:--</div></div>
+      </div>
+      <div class="rank-tbl">
+        <div class="rank-r" id="rr-rocket">🚀 ロケット級<span>～1:10</span></div>
+        <div class="rank-r" id="rr-plane">✈️ 飛行機級<span>～1:19</span></div>
+        <div class="rank-r" id="rr-shinkansen">🚄 新幹線級<span>～1:39</span></div>
+        <div class="rank-r" id="rr-car">🚗 自動車級<span>～2:29</span></div>
+        <div class="rank-r" id="rr-bicycle">🚲 自転車級<span>～3:09</span></div>
+        <div class="rank-r" id="rr-walk">🚶 徒歩級<span>3:10～</span></div>
+      </div>
+      <div class="res-btns">
+        <button class="big-btn" onclick="startGame()">もう一度</button>
+        <button class="big-btn sec-btn" onclick="goTitle()">タイトルへ</button>
+      </div>
+    </div>
+  </div>
+  <footer class="footer">made by <strong>hiro / ヒロ</strong> ｜ <a href="https://github.com/h1ro223" target="_blank">GitHub: h1ro223</a></footer>
+  <script src="./script.js"></script>
+</body>
+</html>
