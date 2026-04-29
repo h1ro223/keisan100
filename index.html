@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>計算100トレーニング</title>
+  <title>計算トレーニング</title>
+  <meta name="description" content="脳を鍛える計算トレーニング。計算100モード・計算20モード対応。キーボード入力・手書き入力に対応。" />
   <link rel="stylesheet" href="./style.css" />
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js"></script>
 </head>
@@ -11,8 +12,13 @@
   <!-- タイトル -->
   <div id="screen-title" class="screen active">
     <div class="title-wrap">
-      <div class="title-logo"><span class="logo-100">100</span><span class="logo-sub">計算トレーニング</span></div>
+      <div class="title-logo"><span class="logo-num" id="logo-num">100</span><span class="logo-sub">計算トレーニング</span></div>
       <div class="title-options">
+        <p class="opt-label">計算モード</p>
+        <div class="opt-row">
+          <button class="opt-btn active" id="btn-mode100" onclick="selCalcMode(100)">計算100</button>
+          <button class="opt-btn" id="btn-mode20" onclick="selCalcMode(20)">計算20</button>
+        </div>
         <p class="opt-label">入力方式</p>
         <div class="opt-row">
           <button class="opt-btn active" id="btn-kb" onclick="selMode('keyboard')">⌨️ キーボード</button>
@@ -26,12 +32,19 @@
         </div>
       </div>
       <button class="big-btn" onclick="startGame()">スタート</button>
-      <p class="title-hint">全100問 ／ 不正解+5秒で次へ ／ タイマーは結果で表示</p>
+      <p class="title-hint" id="title-hint">全100問 ／ 不正解+5秒で次へ ／ タイマーは結果で表示</p>
+      <p class="title-recommend">※このサイトをホーム画面に追加し、横画面でのプレイを推奨しています</p>
     </div>
   </div>
   <!-- ローディング -->
   <div id="screen-loading" class="screen">
     <div class="loading-wrap"><div class="loading-spinner"></div><p id="loading-text">AIモデルを準備中…</p></div>
+  </div>
+  <!-- カウントダウン -->
+  <div id="screen-countdown" class="screen">
+    <div class="countdown-wrap">
+      <span class="countdown-num" id="countdown-num">3</span>
+    </div>
   </div>
   <!-- ゲーム画面 -->
   <div id="screen-game" class="screen">
@@ -42,9 +55,9 @@
     <div class="game-main">
       <!-- 左: 固定3スロット問題表示 -->
       <div class="g-left">
-        <div class="slot slot-prev" id="slot-prev"></div>
-        <div class="slot slot-cur" id="slot-cur"></div>
-        <div class="slot slot-next" id="slot-next"></div>
+        <div class="slot slot-prev" id="slot-prev"><div class="slot-inner" id="slot-prev-inner"></div></div>
+        <div class="slot slot-cur" id="slot-cur"><div class="slot-inner" id="slot-cur-inner"></div></div>
+        <div class="slot slot-next" id="slot-next"><div class="slot-inner" id="slot-next-inner"></div></div>
         <!-- マイルストーン（問題間に表示） -->
         <div class="ms-badge hidden" id="ms-badge"></div>
       </div>
@@ -84,13 +97,8 @@
         <div class="res-card"><div class="rc-label">⚡ ペナルティ</div><div class="rc-val" id="rc-pen">+0秒</div></div>
         <div class="res-card res-hl"><div class="rc-label">🏁 合計タイム</div><div class="rc-val rc-big" id="rc-total">--:--</div></div>
       </div>
-      <div class="rank-tbl">
-        <div class="rank-r" id="rr-rocket">🚀 ロケット級<span>～1:10</span></div>
-        <div class="rank-r" id="rr-plane">✈️ 飛行機級<span>～1:19</span></div>
-        <div class="rank-r" id="rr-shinkansen">🚄 新幹線級<span>～1:39</span></div>
-        <div class="rank-r" id="rr-car">🚗 自動車級<span>～2:29</span></div>
-        <div class="rank-r" id="rr-bicycle">🚲 自転車級<span>～3:09</span></div>
-        <div class="rank-r" id="rr-walk">🚶 徒歩級<span>3:10～</span></div>
+      <div class="rank-tbl" id="rank-tbl">
+        <!-- JS側で動的に生成 -->
       </div>
       <div class="res-btns">
         <button class="big-btn" onclick="startGame()">もう一度</button>

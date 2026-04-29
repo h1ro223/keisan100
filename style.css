@@ -1,4 +1,4 @@
-/* 計算100トレーニング - DS本家再現 */
+/* 計算トレーニング - DS本家再現 */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--blue:#3355cc;--green:#22aa44;--red:#dd2244;--pink:#ff69b4;--gray:#ccc;--r:8px}
 html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:#e8e8e8;color:#111;overflow:hidden}
@@ -7,7 +7,7 @@ html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo
 /* タイトル */
 #screen-title{align-items:center;justify-content:center;padding:20px 16px;background:#fff;overflow-y:auto}
 .title-wrap{max-width:500px;width:100%;text-align:center;display:flex;flex-direction:column;gap:20px}
-.logo-100{display:block;font-size:clamp(90px,24vw,160px);font-weight:900;line-height:1;letter-spacing:-6px;color:var(--blue)}
+.logo-num{display:block;font-size:clamp(90px,24vw,160px);font-weight:900;line-height:1;letter-spacing:-6px;color:var(--blue)}
 .logo-sub{font-size:clamp(20px,5vw,32px);font-weight:800;letter-spacing:.15em}
 .title-options{background:#f0f4ff;border:2px solid var(--gray);border-radius:var(--r);padding:18px;text-align:left;display:flex;flex-direction:column;gap:12px}
 .opt-label{font-size:13px;font-weight:700;color:#888}
@@ -19,7 +19,8 @@ html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo
 .chk-label input{accent-color:var(--blue);width:18px;height:18px}
 .big-btn{width:100%;padding:18px;background:var(--blue);border:none;border-radius:var(--r);font-size:24px;font-weight:900;color:#fff;cursor:pointer}
 .big-btn:active{opacity:.8}.sec-btn{background:#fff;color:#111;border:2px solid var(--gray);font-size:18px}
-.title-hint{font-size:12px;color:#888}
+.title-hint{font-size:clamp(14px,3vw,18px);color:#555;font-weight:700}
+.title-recommend{font-size:clamp(11px,2.5vw,14px);color:#999;line-height:1.5}
 
 /* ローディング */
 #screen-loading{align-items:center;justify-content:center;background:#fff}
@@ -27,6 +28,23 @@ html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo
 .loading-spinner{width:48px;height:48px;border:5px solid var(--gray);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #loading-text{font-size:18px;font-weight:700}
+
+/* カウントダウン */
+#screen-countdown{align-items:center;justify-content:center;background:#fff}
+.countdown-wrap{text-align:center}
+.countdown-num{
+  display:inline-block;
+  font-size:clamp(120px,30vw,220px);
+  font-weight:900;
+  color:var(--blue);
+  line-height:1;
+  animation:countPop .7s cubic-bezier(.175,.885,.32,1.275) both;
+}
+@keyframes countPop{
+  0%{transform:scale(2);opacity:0}
+  50%{transform:scale(.95);opacity:1}
+  100%{transform:scale(1);opacity:1}
+}
 
 /* ===== ゲーム画面 ===== */
 #screen-game{background:#e0e0e0}
@@ -54,16 +72,35 @@ html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo
   display:flex;
   align-items:center;
   justify-content:center;
-  padding:8px 14px;
-  font-size:clamp(32px,6vw,56px);
+  padding:6px 10px;
+  font-size:clamp(46px,9vw,88px);
   font-weight:900;
   color:#111;
   position:relative;
   border-bottom:1px solid #e0e0e0;
-  transition:opacity .3s;
   overflow:hidden;
+  letter-spacing:-0.03em;
 }
 .slot:last-of-type{border-bottom:none}
+
+/* slot-inner: スライドアニメーション用ラッパー */
+.slot-inner{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:100%;
+  height:100%;
+  white-space:nowrap;
+}
+
+/* スライドアニメーション */
+.slot-inner.slide-up{
+  animation:slotSlideUp .28s ease-out both;
+}
+@keyframes slotSlideUp{
+  from{transform:translateY(100%);opacity:.4}
+  to{transform:translateY(0);opacity:1}
+}
 
 /* 上スロット(前の問題): ややグレー */
 .slot-prev{color:#555}
@@ -77,28 +114,39 @@ html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo
 /* スロット内テキスト */
 .slot-expr{white-space:nowrap}
 .slot-ans{margin-left:4px}
-.slot-mark{margin-left:6px;font-size:clamp(28px,5vw,48px)}
+.slot-mark{margin-left:6px;font-size:clamp(34px,6.5vw,64px)}
 .slot-mark.ok{color:var(--pink)}
 .slot-mark.ng{color:var(--red)}
 
-/* マイルストーン（問題の上に小さく表示） */
+/* マイルストーン（DS本家グレーバッジ風） */
 .ms-badge{
-  position:absolute;left:50%;transform:translateX(-50%);
-  top:auto;z-index:10;
-  background:#888;color:#fff;
-  font-size:clamp(14px,2.5vw,20px);font-weight:800;
-  padding:4px 16px;border-radius:20px;
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  top:auto;
+  z-index:10;
+  background:#666;
+  color:#fff;
+  font-size:clamp(16px,3vw,22px);
+  font-weight:900;
+  padding:5px 22px;
+  border-radius:99px;
   white-space:nowrap;
+  letter-spacing:.05em;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
   animation:fadeInOut 1.5s ease both;
+  pointer-events:none;
 }
 /* 上スロットと中央スロットの間に配置 */
-.ms-badge.show-between{top:calc(33.3% - 12px)}
+.ms-badge.show-between{
+  top:calc(33.3% - 14px);
+}
 
 @keyframes fadeInOut{
-  0%{opacity:0;transform:translateX(-50%) scale(.8)}
-  15%{opacity:1;transform:translateX(-50%) scale(1)}
-  80%{opacity:1;transform:translateX(-50%) scale(1)}
-  100%{opacity:0;transform:translateX(-50%) scale(.8)}
+  0%{opacity:0;transform:translateX(-50%) scale(.75)}
+  18%{opacity:1;transform:translateX(-50%) scale(1)}
+  75%{opacity:1;transform:translateX(-50%) scale(1)}
+  100%{opacity:0;transform:translateX(-50%) scale(.75)}
 }
 
 /* === 右パネル: 入力のみ画面いっぱい === */
@@ -117,58 +165,67 @@ html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo
   flex-direction:column;
   align-items:center;
   justify-content:center;
-  gap:8px;
-  padding:10px 14px;
-  padding-bottom:40px; /* フッター分 */
+  gap:6px;
+  padding:8px 10px;
+  padding-bottom:44px; /* フッター+やめるボタン分 */
 }
 
 /* キーボード入力 */
 .ans-input{
-  width:100%;max-width:240px;
-  padding:10px;
+  width:calc(100% - 16px);
+  max-width:none;
+  padding:8px;
   font-size:clamp(40px,10vw,64px);font-weight:900;text-align:center;
   background:#fff;border:3px solid #999;border-radius:var(--r);
   color:#111;outline:none;-moz-appearance:textfield;
 }
 .ans-input:focus{border-color:var(--blue)}
 .ans-input::-webkit-outer-spin-button,.ans-input::-webkit-inner-spin-button{-webkit-appearance:none}
-.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:100%;max-width:280px}
-.np-btn{padding:clamp(10px,2.5vh,20px) 0;border-radius:var(--r);border:2px solid #bbb;background:#fff;color:#111;font-size:clamp(22px,5vw,34px);font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;width:calc(100% - 16px);max-width:none}
+.np-btn{padding:clamp(12px,3vh,24px) 0;border-radius:var(--r);border:2px solid #bbb;background:#fff;color:#111;font-size:clamp(24px,5.5vw,38px);font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .np-btn:active{background:var(--blue);color:#fff;border-color:var(--blue);transform:scale(.95)}
-.np-zero{grid-column:span 2}.np-del{font-size:clamp(18px,4vw,28px)}
+.np-zero{grid-column:span 2}.np-del{font-size:clamp(20px,4.5vw,32px)}
 
 /* 書き直しボタン（大きく） */
 .rewrite-btn{
-  width:100%;max-width:280px;
+  width:calc(100% - 16px);
+  max-width:none;
   padding:clamp(10px,2vh,16px);
   border:2px solid #999;border-radius:var(--r);
   background:#e8e8e8;color:#333;
   font-size:clamp(16px,3.5vw,22px);font-weight:700;
   cursor:pointer;
+  flex-shrink:0;
 }
 .rewrite-btn:active{background:#ccc}
 
 /* 手書きキャンバス */
 #hw-canvas{
-  width:100%;max-width:min(280px, calc(100vh - 200px));
-  aspect-ratio:1;
+  width:calc(100% - 16px);
+  max-width:none;
+  flex:1;
+  min-height:0;
+  max-height:calc(100vh - 150px);
   border-radius:var(--r);background:#fff;cursor:crosshair;
   touch-action:none;border:3px solid #999;
+  object-fit:contain;
 }
-.hw-info{font-size:14px;color:#555}
+.hw-info{font-size:14px;color:#555;flex-shrink:0}
 #hw-num{font-size:28px;color:var(--blue)}
 
 /* フィードバック */
-.fb{position:absolute;bottom:36px;left:0;right:0;text-align:center;font-size:clamp(16px,3vw,22px);font-weight:800;pointer-events:none;z-index:5}
+.fb{position:absolute;bottom:50px;left:0;right:0;text-align:center;font-size:clamp(16px,3vw,22px);font-weight:800;pointer-events:none;z-index:5}
 .fb.ok-fb{color:var(--green)}.fb.ng-fb{color:var(--red)}
 
-/* やめるボタン（右下小さく） */
+/* やめるボタン（右下、フッターと被らないよう調整） */
 .quit-btn{
-  position:absolute;bottom:28px;right:8px;
-  padding:4px 12px;border:1px solid var(--red);border-radius:4px;
-  background:transparent;color:var(--red);font-size:11px;font-weight:600;
-  cursor:pointer;z-index:5;
+  position:absolute;bottom:32px;right:12px;
+  padding:8px 18px;border:2px solid var(--red);border-radius:6px;
+  background:rgba(255,255,255,.9);color:var(--red);font-size:14px;font-weight:700;
+  cursor:pointer;z-index:6;
+  -webkit-tap-highlight-color:transparent;
 }
+.quit-btn:active{background:var(--red);color:#fff}
 
 /* ===== 結果画面 ===== */
 #screen-result{align-items:center;justify-content:center;padding:20px 16px 50px;overflow-y:auto;background:#fff}

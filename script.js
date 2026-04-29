@@ -1,37 +1,92 @@
 /**
- * 計算100トレーニング - script.js
- * 固定3スロット表示 + ONNX手書き認識
+ * 計算トレーニング - script.js
+ * 計算100 / 計算20 対応 + ONNX手書き認識
  */
 'use strict';
 
-const TOTAL=100,PENALTY=5,MS_SHOW=1500;
-const RANKS=[
-  {key:'rocket',max:70,emoji:'🚀',label:'ロケット級',id:'rr-rocket'},
-  {key:'plane',max:79,emoji:'✈️',label:'飛行機級',id:'rr-plane'},
-  {key:'shinkansen',max:99,emoji:'🚄',label:'新幹線級',id:'rr-shinkansen'},
-  {key:'car',max:149,emoji:'🚗',label:'自動車級',id:'rr-car'},
-  {key:'bicycle',max:189,emoji:'🚲',label:'自転車級',id:'rr-bicycle'},
-  {key:'walk',max:Infinity,emoji:'🚶',label:'徒歩級',id:'rr-walk'},
+const PENALTY=5;
+/* 計算100用ランク */
+const RANKS100=[
+  {key:'rocket',max:70,emoji:'🚀',label:'ロケット級',time:'～1:10'},
+  {key:'plane',max:79,emoji:'✈️',label:'飛行機級',time:'～1:19'},
+  {key:'shinkansen',max:99,emoji:'🚄',label:'新幹線級',time:'～1:39'},
+  {key:'car',max:149,emoji:'🚗',label:'自動車級',time:'～2:29'},
+  {key:'bicycle',max:189,emoji:'🚲',label:'自転車級',time:'～3:09'},
+  {key:'walk',max:Infinity,emoji:'🚶',label:'徒歩級',time:'3:10～'},
+];
+/* 計算20用ランク */
+const RANKS20=[
+  {key:'rocket',max:11,emoji:'🚀',label:'ロケット級',time:'～11秒'},
+  {key:'plane',max:14,emoji:'✈️',label:'飛行機級',time:'～14秒'},
+  {key:'shinkansen',max:17,emoji:'🚄',label:'新幹線級',time:'～17秒'},
+  {key:'car',max:29,emoji:'🚗',label:'自動車級',time:'～29秒'},
+  {key:'bicycle',max:39,emoji:'🚲',label:'自転車級',time:'～39秒'},
+  {key:'walk',max:Infinity,emoji:'🚶',label:'徒歩級',time:'40秒～'},
 ];
 
-const S={mode:'keyboard',add:true,sub:true,mul:true,qs:[],idx:0,miss:0,pen:0,t0:0,pure:0,judging:false,msShowing:false,autoTimer:null,hwTimer:null,session:null,modelReady:false,useTemplate:false};
+const S={
+  mode:'keyboard',calcMode:100,
+  add:true,sub:true,mul:true,
+  qs:[],idx:0,miss:0,pen:0,t0:0,pure:0,
+  judging:false,autoTimer:null,hwTimer:null,
+  session:null,modelReady:false,useTemplate:false
+};
 const $=id=>document.getElementById(id);
 
 /* ===== 画面切替 ===== */
 function showScr(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(id).classList.add('active')}
+
+/* 入力方式選択 */
 function selMode(m){S.mode=m;$('btn-kb').classList.toggle('active',m==='keyboard');$('btn-hw').classList.toggle('active',m==='handwriting')}
+
+/* 計算モード選択 */
+function selCalcMode(n){
+  S.calcMode=n;
+  $('btn-mode100').classList.toggle('active',n===100);
+  $('btn-mode20').classList.toggle('active',n===20);
+  $('logo-num').textContent=n;
+  $('title-hint').textContent=n===100
+    ?'全100問 ／ 不正解+5秒で次へ ／ タイマーは結果で表示'
+    :'全20問 ／ 不正解+5秒で次へ ／ タイマーは結果で表示';
+}
 
 /* ===== ゲーム開始 ===== */
 async function startGame(){
   S.add=$('chk-add').checked;S.sub=$('chk-sub').checked;S.mul=$('chk-mul').checked;
   if(!S.add&&!S.sub&&!S.mul){alert('種類を1つ以上選択');return}
+
+  /* 手書きモードならモデル読み込み */
   if(S.mode==='handwriting'&&!S.modelReady){
     showScr('screen-loading');
     try{await loadModel()}catch(e){alert('モデル読み込み失敗: '+e.message);showScr('screen-title');return}
   }
-  S.qs=genQs(TOTAL);S.idx=0;S.miss=0;S.pen=0;S.judging=false;S.msShowing=false;
+
+  /* カウントダウン */
+  await doCountdown();
+
+  /* ゲーム初期化 */
+  const total=S.calcMode;
+  S.qs=genQs(total);S.idx=0;S.miss=0;S.pen=0;S.judging=false;
   $('feedback').textContent='';$('feedback').className='fb';$('ans-input').value='';
-  updProg();applyMode();showScr('screen-game');renderSlots();S.t0=performance.now();
+  updProg();applyMode();showScr('screen-game');renderSlots(false);
+
+  /* 問題画面表示後にタイマー開始 */
+  S.t0=performance.now();
+}
+
+/* ===== カウントダウン ===== */
+async function doCountdown(){
+  showScr('screen-countdown');
+  for(let i=3;i>=1;i--){
+    $('countdown-num').textContent=i;
+    /* アニメーションリセット */
+    $('countdown-num').style.animation='none';
+    void $('countdown-num').offsetWidth; /* reflow */
+    $('countdown-num').style.animation='';
+    await slp(800);
+  }
+  /* カウントダウン終了、0.5秒後にゲーム画面へ */
+  await slp(500);
 }
 
 /* ===== 問題生成 ===== */
@@ -47,21 +102,31 @@ function applyMode(){
 }
 
 /* ===== 3スロット表示 ===== */
-function renderSlots(){
+function renderSlots(animate=true){
+  const total=S.calcMode;
   const prev=S.idx>0?S.qs[S.idx-1]:null;
   const cur=S.qs[S.idx]||null;
-  const next=S.idx+1<TOTAL?S.qs[S.idx+1]:null;
+  const next=S.idx+1<total?S.qs[S.idx+1]:null;
 
-  // 上スロット: 前の問題（解答済み）
-  $('slot-prev').innerHTML=prev?formatAnswered(prev):'';
+  /* 上スロット: 前の問題（解答済み） */
+  $('slot-prev-inner').innerHTML=prev?formatAnswered(prev):'';
 
-  // 中央スロット: 現在の問題
-  $('slot-cur').innerHTML=cur?`<span class="slot-expr">${cur.a}${cur.op}${cur.b}＝</span>`:'';
+  /* 中央スロット: 現在の問題 */
+  $('slot-cur-inner').innerHTML=cur?`<span class="slot-expr">${cur.a}${cur.op}${cur.b}＝</span>`:'';
 
-  // 下スロット: 次の問題（予告）
-  $('slot-next').innerHTML=next?`<span class="slot-expr">${next.a}${next.op}${next.b}＝</span>`:'';
+  /* 下スロット: 次の問題（予告） */
+  $('slot-next-inner').innerHTML=next?`<span class="slot-expr">${next.a}${next.op}${next.b}＝</span>`:'';
 
-  // 入力リセット
+  /* スライドアニメーション */
+  if(animate){
+    document.querySelectorAll('.slot-inner').forEach(el=>{
+      el.classList.remove('slide-up');
+      void el.offsetWidth; /* reflow */
+      el.classList.add('slide-up');
+    });
+  }
+
+  /* 入力リセット */
   $('ans-input').value='';$('feedback').textContent='';$('feedback').className='fb';
   cancelTimers();
   if(S.mode==='keyboard')setTimeout(()=>$('ans-input').focus(),50);
@@ -77,11 +142,11 @@ function formatAnswered(q){
   return`<span class="slot-expr">${q.a}${q.op}${q.b}＝${q.userAns}</span>${mark}`;
 }
 
-function updProg(){$('prog-fill').style.width=(S.idx/TOTAL*100)+'%';$('prog-text').textContent=`${S.idx} / ${TOTAL}`}
+function updProg(){const total=S.calcMode;$('prog-fill').style.width=(S.idx/total*100)+'%';$('prog-text').textContent=`${S.idx} / ${total}`}
 
 /* ===== 判定 ===== */
 function judge(val){
-  if(S.judging||S.msShowing||isNaN(val))return;
+  if(S.judging||isNaN(val))return;
   S.judging=true;cancelTimers();
   const q=S.qs[S.idx];
   q.userAns=val;
@@ -93,32 +158,46 @@ function judge(val){
     S.miss++;S.pen+=PENALTY;
     showFB(`❌ 不正解 (答え:${q.ans}) +5秒`,'ng-fb');
   }
-  // 現在スロットを解答済みに更新
-  $('slot-cur').innerHTML=formatAnswered(q);
-  // 少し待ってから次へ
-  setTimeout(()=>{$('feedback').textContent='';$('feedback').className='fb';advance()},q.correct?400:900);
+  /* 現在スロットを解答済みに更新 */
+  $('slot-cur-inner').innerHTML=formatAnswered(q);
+
+  if(q.correct){
+    /* 正解 → ノータイムで次へ */
+    $('feedback').textContent='';$('feedback').className='fb';
+    advance();
+  }else{
+    /* 不正解 → 少し表示してから次へ */
+    setTimeout(()=>{$('feedback').textContent='';$('feedback').className='fb';advance()},900);
+  }
 }
 
 function showFB(m,c){$('feedback').textContent=m;$('feedback').className=`fb ${c}`}
 
 function advance(){
   S.idx++;updProg();
-  if(S.idx>=TOTAL){S.pure=(performance.now()-S.t0)/1000;setTimeout(showResult,400);S.judging=false;return}
-  // 10問突破チェック
-  if(S.idx%10===0){
-    showMS(S.idx,()=>{S.judging=false;renderSlots()});
-  }else{
-    S.judging=false;renderSlots();
+  const total=S.calcMode;
+  if(S.idx>=total){
+    S.pure=(performance.now()-S.t0)/1000;
+    setTimeout(showResult,400);
+    S.judging=false;
+    return;
   }
+  /* マイルストーン表示（ブロックしない、バッジだけ表示） */
+  if(S.idx%10===0){
+    showMS(S.idx);
+  }
+  /* ノータイムで次の問題へ */
+  S.judging=false;
+  renderSlots(true);
 }
 
-/* ===== マイルストーン（インライン表示） ===== */
-function showMS(n,cb){
-  S.msShowing=true;
+/* ===== マイルストーン（ノンブロッキング表示） ===== */
+function showMS(n){
   const badge=$('ms-badge');
   badge.textContent=`${n}問突破`;
   badge.className='ms-badge show-between';
-  setTimeout(()=>{badge.className='ms-badge hidden';S.msShowing=false;cb()},MS_SHOW);
+  /* 自然にフェードアウト（ゲーム進行をブロックしない） */
+  setTimeout(()=>{badge.className='ms-badge hidden'},1800);
 }
 
 /* ===== キーボード入力 ===== */
@@ -147,12 +226,30 @@ function showResult(){
   const total=S.pure+S.pen;
   $('rc-pure').textContent=fmtTime(S.pure);$('rc-miss').textContent=`${S.miss}回`;
   $('rc-pen').textContent=`+${S.pen}秒`;$('rc-total').textContent=fmtTime(total);
-  const r=RANKS.find(r=>total<=r.max)||RANKS[RANKS.length-1];
+
+  const ranks=S.calcMode===100?RANKS100:RANKS20;
+  const r=ranks.find(r=>total<=r.max)||ranks[ranks.length-1];
   $('res-rank-icon').textContent=r.emoji;$('res-rank-name').textContent=r.label;
-  RANKS.forEach(rr=>{const el=$(rr.id);if(el)el.classList.toggle('hit',rr.key===r.key)});
+
+  /* ランク表を動的生成 */
+  const tbl=$('rank-tbl');
+  tbl.innerHTML='';
+  ranks.forEach(rr=>{
+    const div=document.createElement('div');
+    div.className='rank-r'+(rr.key===r.key?' hit':'');
+    div.innerHTML=`${rr.emoji} ${rr.label}<span>${rr.time}</span>`;
+    tbl.appendChild(div);
+  });
+
   showScr('screen-result');
 }
-function fmtTime(s){return`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`}
+
+function fmtTime(s){
+  if(S.calcMode===20&&s<60){
+    return`${s.toFixed(1)}秒`;
+  }
+  return`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+}
 function goTitle(){showScr('screen-title')}
 
 /* =================================================================
@@ -252,10 +349,10 @@ async function loadModel(){
   $('loading-text').textContent='MNISTモデルを読み込み中…';
   const urls=['https://media.githubusercontent.com/media/onnx/models/main/validated/vision/classification/mnist/model/mnist-12.onnx'];
   for(const url of urls){
-    try{const resp=await fetch(url);if(!resp.ok)continue;const buf=await resp.arrayBuffer();S.session=await ort.InferenceSession.create(buf);S.modelReady=true;$('loading-text').textContent='準備完了！';await slp(300);return}catch(e){console.warn('ONNX失敗:',url,e)}
+    try{const resp=await fetch(url);if(!resp.ok)continue;const buf=await resp.arrayBuffer();S.session=await ort.InferenceSession.create(buf);S.modelReady=true;$('loading-text').textContent='準備完了！';await slp(600);return}catch(e){console.warn('ONNX失敗:',url,e)}
   }
   $('loading-text').textContent='フォールバックモデルを準備中…';
-  await buildTemplateModel();S.modelReady=true;S.useTemplate=true;$('loading-text').textContent='準備完了！';await slp(300);
+  await buildTemplateModel();S.modelReady=true;S.useTemplate=true;$('loading-text').textContent='準備完了！';await slp(600);
 }
 
 /* テンプレートマッチング（フォールバック） */
