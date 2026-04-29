@@ -1,4 +1,5 @@
-# keisan100
-unko
+# 第8作 計算20/計算100 (脳を鍛える大人のdsトレーニング)
 
-https://h1ro223.github.io/keisan100/
+-----------------------------------
+
+# ここから→ https://h1ro223.github.io/keisan100/
