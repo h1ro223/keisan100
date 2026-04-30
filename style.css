@@ -157,6 +157,10 @@ html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo
   background:#d8d8d8;
   position:relative;
   overflow:hidden;
+  /* スマホでコピーポップアップ防止 */
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
 }
 
 .input-full{
@@ -201,14 +205,17 @@ html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo
 
 /* 手書きキャンバス */
 #hw-canvas{
-  width:calc(100% - 16px);
+  width:calc(100% - 24px);
   max-width:none;
   flex:1;
   min-height:0;
-  max-height:calc(100vh - 150px);
+  max-height:calc(100vh - 180px);
   border-radius:var(--r);background:#fff;cursor:crosshair;
   touch-action:none;border:3px solid #999;
   object-fit:contain;
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
 }
 .hw-info{font-size:14px;color:#555;flex-shrink:0}
 #hw-num{font-size:28px;color:var(--blue)}
@@ -237,9 +244,7 @@ html,body{height:100%;font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Meiryo
 .res-hl{grid-column:span 2;border-color:var(--blue)}
 .rc-label{font-size:13px;font-weight:700;color:#888;margin-bottom:4px}
 .rc-val{font-size:28px;font-weight:900}.rc-big{font-size:40px;color:var(--blue)}
-.rank-tbl{width:100%;background:#f0f4ff;border:2px solid var(--gray);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:3px}
-.rank-r{display:flex;justify-content:space-between;padding:5px 10px;border-radius:5px;font-size:14px;font-weight:600;color:#888;border:1px solid transparent}
-.rank-r.hit{background:rgba(51,85,204,.1);border-color:var(--blue);color:var(--blue);font-weight:800}
+
 .res-btns{display:flex;gap:10px;width:100%}.res-btns .big-btn{font-size:20px;padding:14px}
 
 /* フッター */

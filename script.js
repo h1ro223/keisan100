@@ -83,14 +83,24 @@ async function doCountdown(){
     $('countdown-num').style.animation='none';
     void $('countdown-num').offsetWidth; /* reflow */
     $('countdown-num').style.animation='';
-    await slp(800);
+    await slp(1000);
   }
   /* カウントダウン終了、0.5秒後にゲーム画面へ */
   await slp(500);
 }
 
-/* ===== 問題生成 ===== */
-function genQs(n){const ops=[];if(S.add)ops.push('+');if(S.sub)ops.push('-');if(S.mul)ops.push('×');return Array.from({length:n},()=>makeQ(ops[Math.floor(Math.random()*ops.length)]))}
+/* ===== 問題生成（連続同問題防止） ===== */
+function genQs(n){
+  const ops=[];if(S.add)ops.push('+');if(S.sub)ops.push('-');if(S.mul)ops.push('×');
+  const qs=[];
+  for(let i=0;i<n;i++){
+    let q,tries=0;
+    do{q=makeQ(ops[Math.floor(Math.random()*ops.length)]);tries++}
+    while(tries<20 && qs.length>0 && qs[qs.length-1].a===q.a && qs[qs.length-1].op===q.op && qs[qs.length-1].b===q.b);
+    qs.push(q);
+  }
+  return qs;
+}
 function makeQ(op){let a,b,ans;if(op==='+'){a=rand(0,19);b=rand(0,19);ans=a+b}else if(op==='-'){a=rand(0,19);b=rand(0,a);ans=a-b}else{a=rand(1,9);b=rand(1,9);ans=a*b}return{a,op,b,ans,userAns:null,correct:null}}
 function rand(lo,hi){return Math.floor(Math.random()*(hi-lo+1))+lo}
 
@@ -231,16 +241,6 @@ function showResult(){
   const r=ranks.find(r=>total<=r.max)||ranks[ranks.length-1];
   $('res-rank-icon').textContent=r.emoji;$('res-rank-name').textContent=r.label;
 
-  /* ランク表を動的生成 */
-  const tbl=$('rank-tbl');
-  tbl.innerHTML='';
-  ranks.forEach(rr=>{
-    const div=document.createElement('div');
-    div.className='rank-r'+(rr.key===r.key?' hit':'');
-    div.innerHTML=`${rr.emoji} ${rr.label}<span>${rr.time}</span>`;
-    tbl.appendChild(div);
-  });
-
   showScr('screen-result');
 }
 
@@ -255,7 +255,7 @@ function goTitle(){showScr('screen-title')}
 /* =================================================================
    手書き入力
    ================================================================= */
-let hwCtx=null,hwDrawing=false,hwLX=0,hwLY=0,hwHasStroke=false;
+let hwCtx=null,hwDrawing=false,hwLX=0,hwLY=0,hwHasStroke=false,hwRecogTimer=null;
 
 function initCanvas(){
   const c=$('hw-canvas');hwCtx=c.getContext('2d',{willReadFrequently:true});
@@ -265,18 +265,36 @@ function initCanvas(){
     c.addEventListener('pointermove',e=>{e.preventDefault();hwM(e)});
     c.addEventListener('pointerup',e=>{e.preventDefault();hwE()});
     c.addEventListener('pointerleave',e=>{e.preventDefault();if(hwDrawing)hwE()});
+    /* コピーポップアップ防止 */
+    c.addEventListener('contextmenu',e=>e.preventDefault());
+    c.addEventListener('selectstart',e=>e.preventDefault());
     c.style.touchAction='none';c._ev=true;
   }
 }
 function getCP(e){const r=$('hw-canvas').getBoundingClientRect();return{x:(e.clientX-r.left)*(280/r.width),y:(e.clientY-r.top)*(280/r.height)}}
-function hwS(e){hwDrawing=true;hwHasStroke=true;const p=getCP(e);hwLX=p.x;hwLY=p.y;hwCtx.beginPath();hwCtx.arc(p.x,p.y,7,0,Math.PI*2);hwCtx.fillStyle='#000';hwCtx.fill();cancelTimers()}
+function hwS(e){
+  hwDrawing=true;hwHasStroke=true;
+  const p=getCP(e);hwLX=p.x;hwLY=p.y;
+  hwCtx.beginPath();hwCtx.arc(p.x,p.y,7,0,Math.PI*2);hwCtx.fillStyle='#000';hwCtx.fill();
+  cancelTimers();
+  /* 書き始めたら認識タイマーもキャンセル */
+  if(hwRecogTimer){clearTimeout(hwRecogTimer);hwRecogTimer=null}
+}
 function hwM(e){if(!hwDrawing)return;const p=getCP(e);hwCtx.beginPath();hwCtx.moveTo(hwLX,hwLY);hwCtx.lineTo(p.x,p.y);hwCtx.strokeStyle='#000';hwCtx.lineWidth=16;hwCtx.lineCap='round';hwCtx.lineJoin='round';hwCtx.stroke();hwLX=p.x;hwLY=p.y}
 function hwE(){
   hwDrawing=false;
   if(!hwHasStroke||S.judging)return;
-  cancelTimers();doRecognize();
+  cancelTimers();
+  /* ストローク終了後700ms待ってから認識（書き終わるまで待つ） */
+  if(hwRecogTimer){clearTimeout(hwRecogTimer);hwRecogTimer=null}
+  hwRecogTimer=setTimeout(()=>{hwRecogTimer=null;doRecognize()},700);
 }
-function clearCanvas(){if(!hwCtx)hwCtx=$('hw-canvas').getContext('2d',{willReadFrequently:true});hwCtx.fillStyle='#fff';hwCtx.fillRect(0,0,280,280);hwHasStroke=false;cancelTimers()}
+function clearCanvas(){
+  if(!hwCtx)hwCtx=$('hw-canvas').getContext('2d',{willReadFrequently:true});
+  hwCtx.fillStyle='#fff';hwCtx.fillRect(0,0,280,280);hwHasStroke=false;
+  cancelTimers();
+  if(hwRecogTimer){clearTimeout(hwRecogTimer);hwRecogTimer=null}
+}
 
 async function doRecognize(){
   if(!S.modelReady||S.judging)return;
@@ -284,6 +302,7 @@ async function doRecognize(){
   if(result===null){$('hw-num').textContent='?';return}
   $('hw-num').textContent=result;
   const q=S.qs[S.idx];
+  /* 認識結果が正解なら判定、不正解なら2秒後に再認識して判定 */
   if(result===q.ans){judge(result)}
   else{S.hwTimer=setTimeout(()=>{recognizeDigits().then(r2=>{const f=(r2!==null)?r2:result;$('hw-num').textContent=f;judge(f)})},2000)}
 }
@@ -304,13 +323,25 @@ function findInk(imgData,w,h){
   return{minX,maxX,minY,maxY,count,cols};
 }
 
+/* 改善版: 2桁の数字分割をより正確に */
 function splitDigits(ink,w){
   const{minX,maxX,minY,maxY,cols}=ink;const bw=maxX-minX;
-  if(bw<60)return[{minX,maxX,minY,maxY}];
-  const s=Math.floor(bw*0.2)+minX,e=Math.floor(bw*0.8)+minX;
-  let bp=-1,bl=0,gs=-1;
-  for(let c=s;c<=e;c++){if(cols[c]===0){if(gs===-1)gs=c;const l=c-gs+1;if(l>bl){bl=l;bp=gs+Math.floor(l/2)}}else gs=-1}
-  if(bl>=10)return[{minX,maxX:bp-1,minY,maxY},{minX:bp,maxX,minY,maxY}];
+  /* 幅が狭いなら1桁 */
+  if(bw<50)return[{minX,maxX,minY,maxY}];
+  /* 中央付近でインクが最も少ない点を探す */
+  const s=Math.floor(bw*0.25)+minX,e=Math.floor(bw*0.75)+minX;
+  let bp=-1,bestScore=Infinity;
+  for(let c=s;c<=e;c++){
+    /* その列と前後2列のインク合計（ギャップが完全でなくても、インクが少ない箇所で分割） */
+    let score=0;
+    for(let k=-2;k<=2;k++){const cc=c+k;if(cc>=minX&&cc<=maxX)score+=cols[cc]}
+    if(score<bestScore){bestScore=score;bp=c}
+  }
+  /* ギャップが十分小さい場合のみ分割 */
+  const avgColInk=ink.count/bw;
+  if(bestScore<avgColInk*2.5 && bp>minX+10 && bp<maxX-10){
+    return[{minX,maxX:bp-1,minY,maxY},{minX:bp,maxX,minY,maxY}];
+  }
   return[{minX,maxX,minY,maxY}];
 }
 
